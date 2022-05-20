@@ -1,0 +1,16 @@
+[package]
+name = "rustOS"
+version = "0.1.0"
+edition = "2018"
+
+
+# setting panic strategy to abort instead of unwinding processes to find the parent thread using OS specific libraries (libunwind).
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
