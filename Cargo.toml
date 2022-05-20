@@ -11,6 +11,9 @@ panic = "abort"
 [profile.release]
 panic = "abort"
 
+[target.'cfg(target_os = "none")']
+runner = "bootimage runner"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

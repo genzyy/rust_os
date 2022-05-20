@@ -9,7 +9,7 @@ static HELLO: &[u8] = b"Hello World!";
 pub extern "C" fn _start() -> ! {
     // this function is the entry point, since the linker looks for a function
     // named `_start` by default
-    let vga_buffer = 0xb800 as *mut u8; // raw pointer converted to an u8 integer.
+    let vga_buffer = 0xb8000 as *mut u8; // raw pointer converted to an u8 integer.
 
     for (i, &byte) in HELLO.iter().enumerate() {
         //  i -> index of characters from HELLO, byte -> bytes from HELLO.
