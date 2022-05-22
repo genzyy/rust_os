@@ -8,7 +8,7 @@ lazy_static! {
         // lazy_static code will be initialized when it is being accessed for first time.
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
-        color_code: ColorCode::new(Color::Yellow, Color::Black),
+        color_code: ColorCode::new(Color::LightGreen, Color::Black),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) }   // use of static mut is discouraged because it can lead to data races and data overwrite.
     });
 }
@@ -120,7 +120,7 @@ impl Writer {
 
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
-            for col in 1..BUFFER_WIDTH {
+            for col in 0..BUFFER_WIDTH {
                 let character: ScreenChar = self.buffer.chars[row][col].read();
                 self.buffer.chars[row - 1][col].write(character);
             }

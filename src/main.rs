@@ -12,12 +12,14 @@ pub extern "C" fn _start() -> ! {
     // vga_buffer::WRITER.lock().write_str("Hello again!").unwrap();
     // write!(vga_buffer::WRITER.lock(), "some numbers: {} {}", 42, 1.337).unwrap();
     println!("This is {}'s kernel printing some BS", "genzyy");
+    panic!("panic message here");
 
     loop {}
 }
 
 /// This function is called on panic.
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
+    println!("{}", info);
     loop {}
 }
