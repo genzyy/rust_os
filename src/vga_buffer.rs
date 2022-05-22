@@ -4,12 +4,18 @@ use spin::Mutex;
 use volatile::Volatile;
 
 lazy_static! {
+        // statics are initialized at compile time so we cannot use vga_buffer address.
+        // lazy_static code will be initialized when it is being accessed for first time.
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
         color_code: ColorCode::new(Color::Yellow, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) }
+        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) }   // use of static mut is discouraged because it can lead to data races and data overwrite.
     });
 }
+
+// to mutate a variable when there are immutable references to it, we use interior mutability.
+// To get a basic lock and mutual exclusion without any lock ability and threads, we can use spinlock -> a basic kind of mutex.
+// It keeps the thread in a tight loop constantly looking for mutex, and once mutex is free, thread can take it and it does not block mutex.
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -148,3 +154,31 @@ impl Writer {
         write!(writer, "The numbers are {} and {}", 42, 2.0 / 3.0).unwrap();
     }
 }
+
+// make this macro available to the whole crate.
+#[macro_export]
+// _print function comes from io crate and format_args macro formats all arguments
+// passed to custom macro.
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => (crate::print!("\n"));
+    ($($arg:tt)*) => (crate::print!("{}\n", format_args!($($arg)*)))
+}
+
+#[doc(hidden)]
+pub fn _print(args: fmt::Arguments) {
+    use core::fmt::Write;
+    WRITER.lock().write_fmt(args).unwrap();
+}
+
+// custom macro.
+// macro_rules! hello {
+//     () => {
+//         return print!("\n");
+//     };
+//     ($($arg:tt)*) => (print!("{}\n", format_args!($($arg)*)))
+// }
