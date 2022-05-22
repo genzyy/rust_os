@@ -155,6 +155,10 @@ impl Writer {
     }
 }
 
+// macros define how the given argument should be formatted and printed or returned.
+// macros are preprocessed before compilation and are different from functions.
+// functions are compiled while macros are preprocessed.
+
 // make this macro available to the whole crate.
 #[macro_export]
 // _print function comes from io crate and format_args macro formats all arguments
