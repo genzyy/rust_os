@@ -1,30 +1,31 @@
 use core::fmt;
 use lazy_static::lazy_static;
-use spin::Mutex;
+use spin::Mutex;   
 use volatile::Volatile;
 
 lazy_static! {
-        // statics are initialized at compile time so we cannot use vga_buffer address.
-        // lazy_static code will be initialized when it is being accessed for first time.
+    /// A global `Writer` instance that can be used for printing to the VGA text buffer.
+    ///
+    /// Used by the `print!` and `println!` macros.
+
+    // statics are initialized at compile time so we cannot use vga_buffer address.
+    // lazy_static code will be initialized when it is being accessed for first time.
+
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
-        color_code: ColorCode::new(Color::LightGreen, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) }   // use of static mut is discouraged because it can lead to data races and data overwrite.
+        color_code: ColorCode::new(Color::Yellow, Color::Black),
+        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
+
+    // to mutate a variable when there are immutable references to it, we use interior mutability.
+
+    // To get a basic lock and mutual exclusion without any lock ability and threads, we can use spinlock -> a basic kind of mutex.
+
+    // It keeps the thread in a tight loop constantly looking for mutex, and once mutex is free, thread can take it and it does not block mutex.
+
 }
 
-// to mutate a variable when there are immutable references to it, we use interior mutability.
-// To get a basic lock and mutual exclusion without any lock ability and threads, we can use spinlock -> a basic kind of mutex.
-// It keeps the thread in a tight loop constantly looking for mutex, and once mutex is free, thread can take it and it does not block mutex.
-
-impl fmt::Write for Writer {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s);
-        Ok(())
-    }
-}
-
-// The standard color palette in VGA text mode.
+/// The standard color palette in VGA text mode.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -47,56 +48,62 @@ pub enum Color {
     White = 15,
 }
 
-// A combination of a foreground and a background color.
+/// A combination of a foreground and a background color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 struct ColorCode(u8);
 
 impl ColorCode {
+    /// Create a new `ColorCode` with the given foreground and background colors.
     fn new(foreground: Color, background: Color) -> ColorCode {
-        return ColorCode((background as u8) << 4 | (foreground as u8));
+        ColorCode((background as u8) << 4 | (foreground as u8))
     }
 }
 
-// A screen character in the VGA text buffer, consisting of an ASCII character and a `ColorCode`.
+/// A screen character in the VGA text buffer, consisting of an ASCII character and a `ColorCode`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// #[repr(transparent)]
+#[repr(C)]
 struct ScreenChar {
     ascii_character: u8,
     color_code: ColorCode,
 }
 
-// Height of text buffer -> 25 lines.
+/// The height of the text buffer (normally 25 lines).
 const BUFFER_HEIGHT: usize = 25;
-// Width of text buffer -> 80 columns.
+/// The width of the text buffer (normally 80 columns).
 const BUFFER_WIDTH: usize = 80;
 
-// A structure that represents vga buffer where we can write content.
+/// A structure representing the VGA text buffer.
 #[repr(transparent)]
 struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
+/// A writer type that allows writing ASCII bytes and strings to an underlying `Buffer`.
+///
+/// Wraps lines at `BUFFER_WIDTH`. Supports newline characters and implements the
+/// `core::fmt::Write` trait.
 pub struct Writer {
-    column_position: usize,      // keeps track of current position of carret
-    color_code: ColorCode, // color with which current buffer needs to be written on vga buffer
-    buffer: &'static mut Buffer, // reference to that buffer -> 'static tells that the reference is valid for the whole program.
+    column_position: usize,
+    color_code: ColorCode,
+    buffer: &'static mut Buffer,
 }
 
 impl Writer {
+    /// Writes an ASCII byte to the buffer.
+    ///
+    /// Wraps lines at `BUFFER_WIDTH`. Supports the `\n` newline character.
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
-                    self.new_line()
+                    self.new_line();
                 }
 
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
-                // this gurantees that compiler will never optimize
-                // this or remove it as its redundant.
                 let color_code = self.color_code;
                 self.buffer.chars[row][col].write(ScreenChar {
                     ascii_character: byte,
@@ -107,82 +114,91 @@ impl Writer {
         }
     }
 
-    pub fn write_string(&mut self, s: &str) {
+    /// Writes the given ASCII string to the buffer.
+    ///
+    /// Wraps lines at `BUFFER_WIDTH`. Supports the `\n` newline character. Does **not**
+    /// support strings with non-ASCII characters, since they can't be printed in the VGA text
+    /// mode.
+    fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
-                //printable ASCII byte or newline
+                // printable ASCII byte or newline
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
-                // not in the printable ASCII range
+                // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
             }
         }
     }
 
+    /// Shifts all lines one line up and clears the last row.
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
-                let character: ScreenChar = self.buffer.chars[row][col].read();
+                let character = self.buffer.chars[row][col].read();
                 self.buffer.chars[row - 1][col].write(character);
             }
         }
-
         self.clear_row(BUFFER_HEIGHT - 1);
         self.column_position = 0;
     }
 
+    /// Clears a row by overwriting it with blank characters.
     fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
             color_code: self.color_code,
         };
-
         for col in 0..BUFFER_WIDTH {
             self.buffer.chars[row][col].write(blank);
         }
     }
+}
 
-    pub fn print_something() {
-        use core::fmt::Write;
-        let mut writer: Writer = Writer {
-            column_position: 0,
-            color_code: ColorCode::new(Color::Yellow, Color::Black),
-            buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-        };
-
-        writer.write_byte(b'H');
-        writer.write_string("ello! ");
-        write!(writer, "The numbers are {} and {}", 42, 2.0 / 3.0).unwrap();
+impl fmt::Write for Writer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_string(s);
+        Ok(())
     }
 }
 
-// macros define how the given argument should be formatted and printed or returned.
-// macros are preprocessed before compilation and are different from functions.
-// functions are compiled while macros are preprocessed.
-
-// make this macro available to the whole crate.
+/// Like the `print!` macro in the standard library, but prints to the VGA text buffer.
 #[macro_export]
-// _print function comes from io crate and format_args macro formats all arguments
-// passed to custom macro.
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
 }
 
+/// Like the `println!` macro in the standard library, but prints to the VGA text buffer.
 #[macro_export]
 macro_rules! println {
-    () => (crate::print!("\n"));
-    ($($arg:tt)*) => (crate::print!("{}\n", format_args!($($arg)*)))
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
+/// Prints the given formatted string to the VGA text buffer through the global `WRITER` instance.
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     WRITER.lock().write_fmt(args).unwrap();
 }
 
-// custom macro.
-// macro_rules! hello {
-//     () => {
-//         return print!("\n");
-//     };
-//     ($($arg:tt)*) => (print!("{}\n", format_args!($($arg)*)))
-// }
+#[test_case]
+fn test_println_simple() {
+    println!("test_println_simple output");
+}
+
+#[test_case]
+fn test_println_many() {
+    for _ in 0..200 {
+        println!("test_println_many output");
+    }
+}
+
+#[test_case]
+fn test_println_output() {
+    let s = "Some test string that fits on a single line";
+    println!("{}", s);
+    for (i, c) in s.chars().enumerate() {
+        let screen_char = WRITER.lock().buffer.chars[BUFFER_HEIGHT - 2][i].read();
+        assert_eq!(char::from(screen_char.ascii_character), c);
+    }
+}
