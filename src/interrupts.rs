@@ -17,6 +17,10 @@ use lazy_static::lazy_static;
 // most calls start with push rbp.
 
 // SSE instructions -> Streaming SIMD Extensions.
+
+// double fault has the vector number 8.
+// if double faults are unhandled, a triple fault will occur.
+// Triple faults can’t be caught and most hardware reacts with a system reset.
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
 // to not have unsafe blocks and use static mut, lazy_statics are being used
@@ -25,6 +29,7 @@ lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
         let mut idt: InterruptDescriptorTable = InterruptDescriptorTable::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
+        idt.double_fault.set_handler_fn(double_fault_handler);
         return idt;
     };
 }
@@ -38,6 +43,13 @@ pub fn init_dt() {
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
     crate::println!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
+}
+
+extern "x86-interrupt" fn double_fault_handler(
+    stack_frame: InterruptStackFrame,
+    _error_code: u64,
+) -> ! {
+    panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
 }
 
 // The breakpoint exception is the perfect exception to test exception handling. Its only purpose is to temporarily pause a program when the breakpoint instruction int3 is executed.
