@@ -7,11 +7,13 @@
 
 use core::panic::PanicInfo;
 
+pub mod gdt;
 pub mod interrupts;
 pub mod serial;
 pub mod vga_buffer;
 
 pub fn init() {
+    gdt::init();
     interrupts::init_dt();
 }
 
@@ -75,3 +77,19 @@ pub extern "C" fn _start() -> ! {
 fn panic(info: &PanicInfo) -> ! {
     test_panic_handler(info)
 }
+
+// IST -> Interrupt Stack Table takes all interrupts into the stack instead of adding them to kernel stack
+// This switch from kernel stack to IST happens on hardware level and is done before CPU pushes exception to the stack.
+// IST is an array of 7 stack pointers.
+
+// struct InterruptStackTable {
+//     stack_pointers: [Option<StackPointer>; 7],
+// }
+
+// TSS -> Task State Segment
+// TSS is used to hold information about the tasks (resources, addresses, etc.) for 32-bit machines.
+// IST is a legacy part of TSS
+
+// On x86_64, the TSS no longer holds any task specific information at all. Instead, it holds two stack tables (the IST is one of them) -> IST and PST
+// The only common field between the 32-bit and 64-bit TSS is the pointer to the I/O port permissions bitmap.
+// The Privilege Stack Table is used by the CPU when the privilege level changes
