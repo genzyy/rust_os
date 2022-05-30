@@ -1,6 +1,8 @@
 // during cpu function call, first six integer arguments passed in registers are,
-use crate::gdt;
+use crate::{gdt, print, println};
 use lazy_static::lazy_static;
+use pic8259::ChainedPics;
+use spin;
 /**
  * rdi -> register destination index
  * rsi -> register source index
@@ -10,6 +12,7 @@ use lazy_static::lazy_static;
  * r8 -> register 8
  * r9 -> register 9
  * rip -> points to next cpu instruction
+ * PIC 8259 -> programmable interrupt controller
  */
 // additional arguments are passed on stack
 // results are returned in rax and rdx.
@@ -35,8 +38,34 @@ lazy_static! {
                 .set_handler_fn(double_fault_handler)
                 .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
         }
+        idt[InterruptIndex::Timer.as_usize()].set_handler_fn(timer_interrupt_handler);
         return idt;
     };
+}
+
+// Interrupts provide a way to notify the CPU from attached hardware devices.
+
+pub const PIC_1_OFFSET: u8 = 32;
+pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
+
+pub static PICS: spin::Mutex<ChainedPics> =
+    spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
+// unsafe because wrong offsets could cause undefined behavior.
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum InterruptIndex {
+    Timer = PIC_1_OFFSET,
+}
+
+impl InterruptIndex {
+    fn as_u8(self) -> u8 {
+        self as u8
+    }
+
+    fn as_usize(self) -> usize {
+        usize::from(self.as_u8())
+    }
 }
 
 // static mut IDT: InterruptDescriptorTable = InterruptDescriptorTable::new(); // creating new idt for our kernel.
@@ -64,3 +93,22 @@ pub fn test_breakpoint_exception() {
     //invoke a breakpoint exception.
     // x86_64::instructions::interrupts::int3(); // invoking breakpoint exception.
 }
+
+extern "x86-interrupt" fn timer_interrupt_handler(stack_frame: InterruptStackFrame) {
+    print!(".");
+    /**
+     * PIC expects an explicit “end of interrupt” (EOI) signal from our interrupt handler.
+     * This signal tells the controller that the interrupt was processed and that the system is ready to receive the next interrupt
+     */
+    unsafe {
+        PICS.lock()
+            .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
+    }
+    // We need to be careful to use the correct interrupt vector number,
+    // otherwise we could accidentally delete an important unsent interrupt or cause our system to hang.
+    // This is the reason that the function is unsafe.
+
+    // The hardware timer that we use is called the Programmable Interval Timer or PIT.
+}
+
+//  Deadlocks occur if a thread tries to acquire a lock that will never become free. Thus the thread hangs indefinitely.
