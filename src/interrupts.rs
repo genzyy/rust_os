@@ -1,3 +1,5 @@
+use core::convert::TryInto;
+
 // during cpu function call, first six integer arguments passed in registers are,
 use crate::{gdt, print};
 use lazy_static::lazy_static;
@@ -25,7 +27,10 @@ use spin;
 // double fault has the vector number 8.
 // if double faults are unhandled, a triple fault will occur.
 // Triple faults can’t be caught and most hardware reacts with a system reset.
-use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
+use x86_64::{
+    instructions::port::{PortGeneric, ReadWriteAccess},
+    structures::idt::{InterruptDescriptorTable, InterruptStackFrame},
+};
 
 // to not have unsafe blocks and use static mut, lazy_statics are being used
 // which are initialized when the first time they are referenced.
@@ -39,6 +44,7 @@ lazy_static! {
                 .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
         }
         idt[InterruptIndex::Timer.as_usize()].set_handler_fn(timer_interrupt_handler);
+        idt[InterruptIndex::Keyboard.as_usize()].set_handler_fn(keyboard_interrupt_handler);
         return idt;
     };
 }
@@ -56,6 +62,7 @@ pub static PICS: spin::Mutex<ChainedPics> =
 #[repr(u8)]
 pub enum InterruptIndex {
     Timer = PIC_1_OFFSET,
+    Keyboard,
 }
 
 impl InterruptIndex {
@@ -86,6 +93,39 @@ extern "x86-interrupt" fn double_fault_handler(
     panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
 }
 
+extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    use x86_64::instructions::port::Port;
+
+    // port on which PS/2 controller interrupts are read.
+    let mut port: PortGeneric<u16, ReadWriteAccess> = Port::new(0x60);
+    let scancode: u8 = unsafe { port.read().try_into().unwrap() };
+
+    let key = match scancode {
+        0x02 => Some('1'),
+        0x03 => Some('2'),
+        0x04 => Some('3'),
+        0x05 => Some('4'),
+        0x06 => Some('5'),
+        0x07 => Some('6'),
+        0x08 => Some('7'),
+        0x09 => Some('8'),
+        0x0a => Some('9'),
+        0x0b => Some('0'),
+        _ => None,
+    };
+
+    if let Some(key) = key {
+        print! {"{}", key};
+    }
+
+    // print!("{}", scancode);
+
+    unsafe {
+        PICS.lock()
+            .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
+    }
+}
+
 // The breakpoint exception is the perfect exception to test exception handling. Its only purpose is to temporarily pause a program when the breakpoint instruction int3 is executed.
 
 #[test_case]
@@ -112,3 +152,6 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
 }
 
 //  Deadlocks occur if a thread tries to acquire a lock that will never become free. Thus the thread hangs indefinitely.
+
+// Almost everything in computers, is interrupt driven.
+// The CPU of these computers, work until they get the instructions and interrupt handlers.
