@@ -1,5 +1,5 @@
 // during cpu function call, first six integer arguments passed in registers are,
-use crate::{gdt, print, println};
+use crate::{gdt, print};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use spin;
@@ -94,9 +94,9 @@ pub fn test_breakpoint_exception() {
     // x86_64::instructions::interrupts::int3(); // invoking breakpoint exception.
 }
 
-extern "x86-interrupt" fn timer_interrupt_handler(stack_frame: InterruptStackFrame) {
+extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
     print!(".");
-    /**
+    /*
      * PIC expects an explicit “end of interrupt” (EOI) signal from our interrupt handler.
      * This signal tells the controller that the interrupt was processed and that the system is ready to receive the next interrupt
      */

@@ -19,7 +19,11 @@ pub extern "C" fn _start() -> ! {
     test_main();
 
     println!("It did not crash!");
-    loop {}
+
+    // instead of using an endless loop that uses CPU to its 100%
+    // we should halt the CPU so it waits for a new interrupt and uses less energy
+    // when there is no interrupt to be handled.
+    rust_os::hlt_loop();
 }
 
 /// This function is called on panic.
@@ -27,7 +31,7 @@ pub extern "C" fn _start() -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
-    loop {}
+    rust_os::hlt_loop();
 }
 
 #[cfg(test)]
