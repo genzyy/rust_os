@@ -94,52 +94,6 @@ extern "x86-interrupt" fn double_fault_handler(
 }
 
 extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    use x86_64::instructions::port::Port;
-
-    // port on which PS/2 controller interrupts are read.
-    let mut port: PortGeneric<u16, ReadWriteAccess> = Port::new(0x60);
-    let scancode: u8 = unsafe { port.read().try_into().unwrap() };
-
-    let key = match scancode {
-        0x02 => Some('1'),
-        0x03 => Some('2'),
-        0x04 => Some('3'),
-        0x05 => Some('4'),
-        0x06 => Some('5'),
-        0x07 => Some('6'),
-        0x08 => Some('7'),
-        0x09 => Some('8'),
-        0x0a => Some('9'),
-        0x0b => Some('0'),
-        _ => None,
-    };
-
-    if let Some(key) = key {
-        print! {"{}", key};
-    }
-
-    // print!("{}", scancode);
-
-    unsafe {
-        PICS.lock()
-            .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
-    }
-}
-
-// The breakpoint exception is the perfect exception to test exception handling. Its only purpose is to temporarily pause a program when the breakpoint instruction int3 is executed.
-
-#[test_case]
-pub fn test_breakpoint_exception() {
-    //invoke a breakpoint exception.
-    // x86_64::instructions::interrupts::int3(); // invoking breakpoint exception.
-}
-
-extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    /*
-     * PIC expects an explicit “end of interrupt” (EOI) signal from our interrupt handler.
-     * This signal tells the controller that the interrupt was processed and that the system is ready to receive the next interrupt
-     */
-
     use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
     use spin::Mutex;
     use x86_64::instructions::port::Port;
@@ -167,6 +121,29 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     }
+}
+
+// The breakpoint exception is the perfect exception to test exception handling. Its only purpose is to temporarily pause a program when the breakpoint instruction int3 is executed.
+
+#[test_case]
+pub fn test_breakpoint_exception() {
+    //invoke a breakpoint exception.
+    // x86_64::instructions::interrupts::int3(); // invoking breakpoint exception.
+}
+
+extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    /*
+     * PIC expects an explicit “end of interrupt” (EOI) signal from our interrupt handler.
+     * This signal tells the controller that the interrupt was processed and that the system is ready to receive the next interrupt
+     */
+
+    print!(".");
+
+    unsafe {
+        PICS.lock()
+            .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
+    }
+
     // We need to be careful to use the correct interrupt vector number,
     // otherwise we could accidentally delete an important unsent interrupt or cause our system to hang.
     // This is the reason that the function is unsafe.
