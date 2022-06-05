@@ -155,3 +155,7 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
 
 // Almost everything in computers, is interrupt driven.
 // The CPU of these computers, work until they get the instructions and interrupt handlers.
+
+// If there is no interrupt for any task or from a hardware, there will be timer interrupt.
+// A timer interrupt is an interrupt caused by a timer. Any Interrupt grabs control of a processor core away from whatever process it was running before. It is the responsibility of every interrupt service routine to save any registers it will change and restore them before passing control back to the interrupted program at its next sequential instruction.
+// Timer interrupt is also used for tracking how much time a process is taking to complete.
