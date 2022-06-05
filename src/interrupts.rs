@@ -159,3 +159,35 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
 // If there is no interrupt for any task or from a hardware, there will be timer interrupt.
 // A timer interrupt is an interrupt caused by a timer. Any Interrupt grabs control of a processor core away from whatever process it was running before. It is the responsibility of every interrupt service routine to save any registers it will change and restore them before passing control back to the interrupted program at its next sequential instruction.
 // Timer interrupt is also used for tracking how much time a process is taking to complete.
+
+// Paging and Memory Management
+
+// no process should be able to access another process's memory address.
+// paging is used to create seperate memory for different processes.
+// MPU -> Memory Protection Unit.
+// MPU is used to define small number of memory regions with different access permissions.
+// On each memory access the MPU ensures that the address is in a region with correct access permissions and throws an exception otherwise.
+// On x86, the hardware supports two different approaches to memory protection: segmentation and paging.
+// CS -> code segment register used to fetch instructions.
+// SS -> stack segment register is used for stack operations.
+// DS -> data segment
+// ES -> extra segment
+
+// Virtual Memory -> VPN to access physical memory.
+// Addresses before translation are virtual addresses.
+// Addresses after translation are physical.
+// phyisical addresses will be different from each other as they point to different memory locations
+// but each location will have same address.
+// virutal addresses depends on translation function and it is possible that two different virtual addresses
+// point to same physical address.
+// fragmentation problem is one of the reasons that segmentation is no longer used by most systems.
+// segmentation is not even supported in 64-bit mode on x86 anymore
+
+//  to divide both the virtual and the physical memory space into small, fixed-size blocks.
+// The blocks of the virtual memory space are called pages and the blocks of the physical address space are called frames.
+
+// Each page can be individually mapped to a frame, which makes it possible to split larger memory regions across non-continuous physical frames.
+// to maintain a record of pages and frames, cpu uses a page table with virtual and physical addresses, with permission flags.
+// CR3 register is used to map to this table.
+
+// if we have a very large table, then we have two tables where table level 2  maps memory regions to table level 1.
