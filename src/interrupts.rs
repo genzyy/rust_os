@@ -1,7 +1,7 @@
 use core::convert::TryInto;
 
 // during cpu function call, first six integer arguments passed in registers are,
-use crate::{gdt, print};
+use crate::{gdt, hlt_loop, print, println};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use spin;
@@ -28,8 +28,11 @@ use spin;
 // if double faults are unhandled, a triple fault will occur.
 // Triple faults can’t be caught and most hardware reacts with a system reset.
 use x86_64::{
-    instructions::port::{PortGeneric, ReadWriteAccess},
-    structures::idt::{InterruptDescriptorTable, InterruptStackFrame},
+    instructions::{
+        hlt,
+        port::{PortGeneric, ReadWriteAccess},
+    },
+    structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
 };
 
 // to not have unsafe blocks and use static mut, lazy_statics are being used
@@ -45,6 +48,7 @@ lazy_static! {
         }
         idt[InterruptIndex::Timer.as_usize()].set_handler_fn(timer_interrupt_handler);
         idt[InterruptIndex::Keyboard.as_usize()].set_handler_fn(keyboard_interrupt_handler);
+        idt.page_fault.set_handler_fn(page_fault_handler);
         return idt;
     };
 }
@@ -123,6 +127,25 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
     }
 }
 
+extern "x86-interrupt" fn page_fault_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: PageFaultErrorCode,
+) {
+    use x86_64::registers::control::Cr2;
+
+    println!("EXCEPTION: PAGE FAULT");
+    // when a page fault occurs, the cpu sets cr2 register for the page fault which contains
+    // the virtual address accessed during the page fault or we can say the address which caused
+    // page fault.
+    // error code gives us information about the type of memory access occured -> read/write.
+    println!("Accessed Address: {:?}", Cr2::read());
+    println!("Error Code: {:?}", error_code);
+    println!("{:#?}", stack_frame);
+    hlt_loop();
+
+    // we can read from the current instruction pointer but we cannot write to it.
+}
+
 // The breakpoint exception is the perfect exception to test exception handling. Its only purpose is to temporarily pause a program when the breakpoint instruction int3 is executed.
 
 #[test_case]
@@ -191,3 +214,8 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
 // CR3 register is used to map to this table.
 
 // if we have a very large table, then we have two tables where table level 2  maps memory regions to table level 1.
+
+// The first four characters from right are offset of the address, and then following four characters from right to left are table levels -> virtual address.
+// first 16 characters are sign extensions.
+
+// adding page offset to frame address gives us the phyiscal address.
