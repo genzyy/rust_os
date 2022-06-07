@@ -3,9 +3,15 @@ use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::VirtAddr;
 
+// zombie process -> a process which is complete but is still in process table.
+// Usually happens for parent processes as they are waiting for child process' exit status.
+// Thread Stack -> available for every ongoing thread -> contains useful data as long as a thread is alive.
+
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
 lazy_static! {
+    // TSS -> task state segment -> contains information about a task.
+    // In protected mode, it is used for hardware task switching.
     static ref TSS: TaskStateSegment = {
         let mut tss = TaskStateSegment::new();
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] = {
