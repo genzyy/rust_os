@@ -15,6 +15,10 @@ use spin;
  * r9 -> register 9
  * rip -> points to next cpu instruction
  * PIC 8259 -> programmable interrupt controller
+ * IDT -> interrupt descriptor table -> tasks and interrupts.
+ * GDT -> global descriptor table -> contains memory segments.
+ * FFI -> foreign function interfaces.
+ * ABI -> application binary interface.
  */
 // additional arguments are passed on stack
 // results are returned in rax and rdx.
@@ -37,10 +41,18 @@ use x86_64::{
 
 // to not have unsafe blocks and use static mut, lazy_statics are being used
 // which are initialized when the first time they are referenced.
+
+// lazily evaluated statics.
+// these are initalized when they are accessed for the first time.
 lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
         let mut idt: InterruptDescriptorTable = InterruptDescriptorTable::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
+
+        // the unsafe block in rust means "Trust me, I know what I am doing.".
+        // Basically code outside unsafe block, is rejected by compiler if it thinks it might break something
+        // or is accessing wrong address or anything fishy. But adding it in unsafe block, it says I am doing this
+        // but you the developer is responsible.
         unsafe {
             idt.double_fault
                 .set_handler_fn(double_fault_handler)
@@ -58,12 +70,21 @@ lazy_static! {
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
 
+// const is immutable and does not represent a memory address.
+// static variable point to a precise memory location. These can be modified but it is unsafe (should be done in unsafe block).
+
+// Interior Mutability -> ability to mutate a variable when there are immutable references to it.
+
 pub static PICS: spin::Mutex<ChainedPics> =
     spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 // unsafe because wrong offsets could cause undefined behavior.
 
 #[derive(Debug, Clone, Copy)]
+// Debug -> able to print anything for debug purpose ({:?}).
+// Clone -> able to clone resource instead of assigning or copying.
+// Copy -> let x = 3; let y = x; now x cannot be used as it was moved to y. But using derive(Copy) this can be prevented.
 #[repr(u8)]
+// repr -> represent the memory location as a multiple of u8.
 pub enum InterruptIndex {
     Timer = PIC_1_OFFSET,
     Keyboard,
@@ -86,6 +107,7 @@ pub fn init_dt() {
     IDT.load();
 }
 
+// providing a function to C ABI or x86-interupt ABI.
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
     crate::println!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
 }
