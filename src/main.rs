@@ -14,19 +14,34 @@ use rust_os::println;
 entry_point!(kernel_boot);
 
 fn kernel_boot(boot_info: &'static BootInfo) -> ! {
-    println!("Hello World{}", "!");
+    use rust_os::memory::translate_addr;
+    use x86_64::VirtAddr;
 
+    println!("Hello World{}", "!");
     rust_os::init();
 
-    x86_64::instructions::interrupts::int3(); // invoking breakpoint exceptions.
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
 
-    use x86_64::registers::control::Cr3;
+    let addresses = [
+        // the identity-mapped vga buffer page
+        0xb8000,
+        // some code page
+        0x201008,
+        // some stack page
+        0x0100_0020_1a10,
+        // virtual address mapped to physical address 0
+        boot_info.physical_memory_offset,
+    ];
 
-    let (level_4_page_table, _) = Cr3::read();
-    println!(
-        "Level 4 page table at: {:?}",
-        level_4_page_table.start_address()
-    );
+    for &address in &addresses {
+        let virt = VirtAddr::new(address);
+        let phys = unsafe { translate_addr(virt, phys_mem_offset) };
+        println!("{:?} -> {:?}", virt, phys);
+
+        // the last 12 bits of the addresses remain same
+        // because they are page offset and are not
+        // part of translation.
+    }
 
     #[cfg(test)]
     test_main();
