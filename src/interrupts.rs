@@ -241,3 +241,14 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
 // first 16 characters are sign extensions.
 
 // adding page offset to frame address gives us the phyiscal address.
+
+// Bootimage crate.
+
+// BootInfo -> contains information that is passed to the kernel on boot.
+// It has two parts, memory_map and phyiscal_memory_offset.
+
+// memory_map -> overview of physical memory and gives us how much physical memory is available
+// in the system.
+
+// pyhsical_memory_map -> gives virtual start address of physical memory.
+// adding this offset to physical address gives us virtual address.

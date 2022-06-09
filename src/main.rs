@@ -4,11 +4,16 @@
 #![test_runner(rust_os::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use rust_os::println;
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
+// instead of defining our own start function, using pub extern C, we use entry_point function caller
+// provided by bootiamge crate, so we know what type of function with what arguments should the
+// boot function have.
+entry_point!(kernel_boot);
+
+fn kernel_boot(boot_info: &'static BootInfo) -> ! {
     println!("Hello World{}", "!");
 
     rust_os::init();
