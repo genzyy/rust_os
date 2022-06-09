@@ -105,3 +105,5 @@ fn panic(info: &PanicInfo) -> ! {
 // On x86_64, the TSS no longer holds any task specific information at all. Instead, it holds two stack tables (the IST is one of them) -> IST and PST
 // The only common field between the 32-bit and 64-bit TSS is the pointer to the I/O port permissions bitmap.
 // The Privilege Stack Table is used by the CPU when the privilege level changes
+
+// TLB -> translation lookaside buffer -> special cache to store all recently used transactions.
