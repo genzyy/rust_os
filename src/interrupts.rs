@@ -1,5 +1,3 @@
-use core::convert::TryInto;
-
 // during cpu function call, first six integer arguments passed in registers are,
 use crate::{gdt, hlt_loop, print, println};
 use lazy_static::lazy_static;
@@ -223,7 +221,7 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
 // Addresses after translation are physical.
 // phyisical addresses will be different from each other as they point to different memory locations
 // but each location will have same address.
-// virutal addresses depends on translation function and it is possible that two different virtual addresses
+// virtual addresses depends on translation function and it is possible that two different virtual addresses
 // point to same physical address.
 // fragmentation problem is one of the reasons that segmentation is no longer used by most systems.
 // segmentation is not even supported in 64-bit mode on x86 anymore
@@ -252,3 +250,5 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
 
 // pyhsical_memory_map -> gives virtual start address of physical memory.
 // adding this offset to physical address gives us virtual address.
+
+// translation of phyisical_memory_offset should point to physical address 0.

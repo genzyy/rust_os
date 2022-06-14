@@ -1,5 +1,7 @@
-use x86_64::PhysAddr;
-use x86_64::{structures::paging::PageTable, VirtAddr};
+use bootloader::bootinfo::MemoryMap;
+use x86_64::structures::paging::OffsetPageTable;
+use x86_64::structures::paging::{FrameAllocator, Mapper, Page, PhysFrame, Size4KiB};
+use x86_64::{structures::paging::PageTable, PhysAddr, VirtAddr};
 
 /// Returns a mutable reference to the active level 4 table.
 ///
@@ -67,4 +69,67 @@ fn translate_addr_inner(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Opt
     }
 
     Some(frame.start_address() + u64::from(addr.page_offset()))
+}
+
+// translation of physical_memory_offset should point to physical address 0.
+// For this translation HugeFrame is used.
+
+// 'static -> available for complete runtime of the kernel.
+
+pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
+    let level_4_table = active_level_4_table(physical_memory_offset);
+    OffsetPageTable::new(level_4_table, physical_memory_offset)
+}
+
+pub fn create_example_mapping(
+    page: Page,
+    mapper: &mut OffsetPageTable,
+    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
+    // impl is used to accept all implementations of FrameAllocator trait.
+) {
+    use x86_64::structures::paging::PageTableFlags as Flags;
+
+    let frame = PhysFrame::containing_address(PhysAddr::new(0xb8000));
+    let flags = Flags::PRESENT | Flags::WRITABLE;
+
+    let map_to_result = unsafe {
+        // FIXME: this is not safe, we do it only for testing.
+        mapper.map_to(page, frame, flags, frame_allocator)
+    };
+    map_to_result.expect("map_to failed.").flush();
+}
+
+// simple frame allocator.
+// EmptyFrameAllocator always returns 'None'.
+pub struct EmptyFrameAllocator;
+
+// unsafe because the implementer
+// must guarantee that the allocator yields only unused frames.
+// below code gives us how the EmptyFrameAllocator will be implemented.
+unsafe impl FrameAllocator<Size4KiB> for EmptyFrameAllocator {
+    fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
+        return None;
+    }
+}
+
+/// A FrameAllocator that returns usable frames from the bootloader's memory map.
+// Same as how linked list works.
+pub struct BootInfoFrameAllocator {
+    memory_map: &'static MemoryMap,
+    next: usize,
+}
+
+impl BootInfoFrameAllocator {
+    /// Create a FrameAllocator from the passed memory map.
+    ///
+    /// This function is unsafe because the caller must guarantee that the passed
+    /// memory map is valid. The main requirement is that all frames that are marked
+    /// as `USABLE` in it are really unused.
+
+    pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
+        BootInfoFrameAllocator {
+            memory_map,
+            next: 0,
+        }
+    }
 }

@@ -14,13 +14,23 @@ use rust_os::println;
 entry_point!(kernel_boot);
 
 fn kernel_boot(boot_info: &'static BootInfo) -> ! {
-    use rust_os::memory::translate_addr;
-    use x86_64::VirtAddr;
+    use rust_os::memory;
+    use x86_64::{structures::paging::Page, structures::paging::Translate, VirtAddr};
 
     println!("Hello World{}", "!");
     rust_os::init();
 
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    let mut frame_allocator = memory::EmptyFrameAllocator;
+
+    // map an unused page.
+    let page = Page::containing_address(VirtAddr::new(0));
+    memory::create_example_mapping(page, &mut mapper, &mut frame_allocator);
+
+    // write the string `New!` to the screen through the new mapping.
+    let page_ptr: *mut u64 = page.start_address().as_mut_ptr();
+    unsafe { page_ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e) };
 
     let addresses = [
         // the identity-mapped vga buffer page
@@ -35,7 +45,7 @@ fn kernel_boot(boot_info: &'static BootInfo) -> ! {
 
     for &address in &addresses {
         let virt = VirtAddr::new(address);
-        let phys = unsafe { translate_addr(virt, phys_mem_offset) };
+        let phys = mapper.translate_addr(virt);
         println!("{:?} -> {:?}", virt, phys);
 
         // the last 12 bits of the addresses remain same
