@@ -4,6 +4,9 @@
 #![test_runner(rust_os::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+extern crate alloc;
+
+use alloc::boxed::Box;
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use rust_os::println;
@@ -53,6 +56,8 @@ fn kernel_boot(boot_info: &'static BootInfo) -> ! {
         // part of translation.
     }
 
+    let x = Box::new(41);
+
     #[cfg(test)]
     test_main();
 
@@ -82,3 +87,18 @@ fn panic(info: &PanicInfo) -> ! {
 fn trivial_assertion() {
     assert_eq!(1, 1);
 }
+
+// heap allocation.
+// local variables are only kept for the time until the parent function is alive and are stored
+// on call stack.
+// static variables are stored on a fixed memory location and always live for the complete
+// lifetime of program.
+// these variables are assigned a memory location during compile time by the linker
+// and are encoded in the execution.
+// for static variables, we know their location at compile time, so we dont need a reference to them.
+// Data race -> two threads modify a static variable at the same time.
+// The only way to modify a static variable is to encapsulate it in a Mutex type,
+// which ensures that only a single &mut reference exists at any point in time
+
+// dynamic types work by allocating a larger amount of memory when they become full,
+// copying all elements over, and then deallocating the old allocation.
