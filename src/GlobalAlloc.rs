@@ -1,8 +1,12 @@
 pub unsafe trait GlobalAlloc {
+    // function that allocates memory.
     unsafe fn alloc(&self, layout: Layout) -> *mut u8;
+    // function to free memory.
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout);
 
+    // function to allocate memory and assign all memory locations as zero.
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 { ... }
+    // function to resize the allocated memory.
     unsafe fn realloc(
         &self,
         ptr: *mut u8,

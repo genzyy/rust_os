@@ -36,6 +36,7 @@ use x86_64::{
     VirtAddr,
 };
 
+// init heap function to initialize heap.
 pub fn init_heap(
     mapper: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
@@ -64,6 +65,10 @@ pub fn init_heap(
         unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
     }
     unsafe {
+        // using lock() to lock allocator for initializing heap
+        // without any interference.
+        // and it is unsafe because we are writing to a memory address
+        // given by us and not by the code/compiler.
         ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
     }
     Ok(())
@@ -74,6 +79,13 @@ pub fn init_heap(
 // crate providing smart pointers.
 // references are only used to get the address and they cannot do much.
 // smart pointers are structures which are used as references which can do a lot more.
+// imagine reference pointers to have something like this, they have functions which
+// can be used to make references more usable.
+// struct reference_pointer_struct {
+//     reference_address: VirtAddr,
+//     fun1: Fn(usize) -> usize,
+//     fun2: Fn(usize) -> usize,
+// }
 
 // references borrow the data which they point to.
 // smart pointers own the data which they are made to refer to.

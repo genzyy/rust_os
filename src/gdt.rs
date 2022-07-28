@@ -26,14 +26,28 @@ lazy_static! {
     };
 }
 
+// double fault happens when there is not entry in IDT (Interrupt Descriptor Table)
+// to catch first fault (first fault can be anything related to hardware or software fault or memory fault).
+// There is triple fault as well which occurs when there is no entry or a handler for double fault.
+// When there triple fault occurs, the device shuts down removing everything from the memory.
+
+// Newer chips don't have a triple fault handler because they get the double fault handler right.
+
+// identity mapping means how the page tables are set up.
+
 // stacks on x86 grow downwards, i.e. from high addresses to low addresses.
 // Bootloader maps immutable statics to read-only page.
 
 // GDT -> Global Descriptor Table
 // used for memory segmentation.
+// gives characteristics of various memory area/segments which are being used
+// during the program execution including read/write access priviledge, everything.
 
 // was used to contain structures of a program to isolate different programs on older machines.
 // on x86_64, it used for switching between kernel space and user space and loading a TSS structure.
+
+// though it is said that in x64, segmentation is not used but it is being used when fs and gs registers are used.
+// https://stackoverflow.com/questions/57222727/is-segmentation-completely-not-used-in-x64
 
 lazy_static! {
     static ref GDT: (GlobalDescriptorTable, Selectors) = {
@@ -62,6 +76,8 @@ pub fn init() {
     GDT.0.load();
     unsafe {
         // CS -> code segment register.
+        // code segment in the memory is the place where executable program is stored.
+        // cs register (code segment register) is used to access code segment memory.
         CS::set_reg(GDT.1.code_selector);
         load_tss(GDT.1.tss_selector);
     }
